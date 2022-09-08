@@ -167,17 +167,23 @@ class DealCatcherDB:
 
     def get_deals(self, vendor_acronym = None):
         if vendor_acronym:  # This is a call to show all deals for this vendor
-            rows = select_from_table(self._dealcatcherdb, self.active_table, 'vendor', vendor_acronym)
+            _rows = select_from_table(self._dealcatcherdb, self.active_table, 'vendor', vendor_acronym)
 
         else:  # This is a search request, return every deal in existence
-            rows = list()
+            _rows = list()
             for acronym, name, website, thumbnail in self.get_vendors():
                 vendor_rows = select_from_table(self._dealcatcherdb, self.active_table, 'vendor', acronym)
                 for row in vendor_rows:
-                    print(row)
-                    rows.append(row)
+                    _rows.append(row)
 
-        return rows
+        # We have a list of tuples, we need a list of lists
+        matrix = list()
+        for acronym, name, url, image_url, amount, in_stock, description in matrix:
+            row = list()
+            row.append([acronym, name, url, image_url, amount, in_stock, description])
+            matrix.append(row)
+
+        return matrix
 
 
 dealcatcher_db = DealCatcherDB()

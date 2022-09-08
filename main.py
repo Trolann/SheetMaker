@@ -40,15 +40,18 @@ thumbnail_str = 'Thumbnail'
 for acronym in worksheets:
     worksheets[acronym].resize(rows=1)
     worksheets[acronym].update_row(1, [[vendor_str, product_str, price_str, thumbnail_str]])
+    worksheets[acronym].resize(rows=150)
 
 # Get each vendor's deals and update their pages initially
 for acronym in vendors:
+    #print(acronym)
     vendor_name, vendor_website, vendor_thumbnail = vendors[acronym]
-    vendor_deals = dealcatcher_db.get_deals(acronym)
+    #print(vendor_name, vendor_website, vendor_thumbnail)
+    vendor_matrix = dealcatcher_db.get_deals(acronym)
 
     # Update each deal
-    for name in vendor_deals:
-        pass
+    for row in vendor_matrix:
+        worksheets[acronym].append_table(row, start = 'A2')
 
 # for acronym in worksheets:
 #     print(f'{acronym} is {len('1')} big')
