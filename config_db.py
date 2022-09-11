@@ -1,5 +1,6 @@
 import sqlite3
-from time import sleep
+from time import sleep, time
+from ratelimiter import RateLimiter
 from os import environ
 from random import uniform
 from pathlib import Path
@@ -164,10 +165,37 @@ class ConfigDB:
         self._configdb = path + 'config.db'
         self.table = 'config'
         self.heartbeat_url = self.get_heartbeat('url')
+        self.timer_expire = 0
+        self.api_calls = 0
+        self.rate_limiter = RateLimiter(max_calls=30, period=60, callback=self.limited)
+
+    def limited(self, until):
+        duration = int(round(until - time()))
+        if duration > 2:
+            print(f'Rate limited, sleeping for {duration:d} seconds')
+        else:
+            print('Rate limited, sleeping for 1 second.')
 
     def get_heartbeat(self, value):
         value = 'heartbeat_' + value
         return get_value(self._configdb, self.table, value, get_dev = True)
+
+    def get_all_values(self, sheet):
+        with self.rate_limiter:
+            return sheet.get_all_values()
+
+    def new_deal(self, sheet, current_deal):
+        with self.rate_limiter:
+            sheet.append_row(current_deal, values_input_option='USER_ENTERED')
+
+    def get_worksheet(self, deal_sheet, vendor_name):
+        with self.rate_limiter:
+            return deal_sheet.worksheet(vendor_name)
+
+    def remove_deal(self, sheet, deal_name):
+        row = sheet.find(deal_name).row
+        with self.rate_limiter:
+            sheet.delete_rows(row)
 
 
 config_db = ConfigDB()

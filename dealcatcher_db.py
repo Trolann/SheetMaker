@@ -27,10 +27,10 @@ except KeyError:
 
 try:
     path = environ['DIR_PATH']
-    print(f'Dealcatcher path: {path}')
+    print(f'SheetMaker path: {path}')
 except KeyError:
     path = ''
-    print('Dealcatcher path: local')
+    print('SheetMaker path: local')
 
 
 try:
@@ -42,7 +42,7 @@ except KeyError:
 
 try:
     heartbeat_url = environ['HEARTBEAT_URL']
-    print(f'DealCatcher heartbeat url: {heartbeat_url}')
+    print(f'SheetMaker heartbeat url: {heartbeat_url}')
 except KeyError:
     heartbeat_url = ''
     print('NO HEARTBEAT URL LOADED')
@@ -63,31 +63,31 @@ def _db_recur(cursor, sql, called_from, recur_depth = 0):
             print(f'called from: {called_from}')
 
 
-def remove(db, table, option, commit_to_db=True):
+def remove(db, table, option, commit_to_db=True, sql=None):
     connection = sqlite3.connect(db)
     cursor = connection.cursor()
-    sql = "DELETE FROM {} WHERE url = '{}'".format(table, option)
+    sql = "DELETE FROM {} WHERE url = '{}'".format(table, option) if not sql else sql
     _db_recur(cursor, sql, 'remove')
     if commit_to_db:
         connection.commit()
     cursor.close()
 
 
-def remove_like_value(db, table, vendor_like, url_like, commit_to_db=True):
+def remove_like_value(db, table, vendor_like, url_like, commit_to_db=True, sql=None):
     connection = sqlite3.connect(db)
     cursor = connection.cursor()
-    sql = "DELETE FROM {} WHERE vendor = '{}' AND url LIKE '%{}%'".format(table, vendor_like, url_like)
+    sql = "DELETE FROM {} WHERE vendor = '{}' AND url LIKE '%{}%'".format(table, vendor_like, url_like) if not sql else sql
     _db_recur(cursor, sql, 'remove_like_value')
     if commit_to_db:
         connection.commit()
     cursor.close()
 
 
-def insert(db, table, to_insert, commit_to_db = True):
+def insert(db, table, to_insert, commit_to_db = True, sql=None):
     """Inserts into sqlite db with the option:value schema"""
     connection = sqlite3.connect(db)
     cursor = connection.cursor()
-    sql = 'INSERT OR REPLACE INTO {} VALUES {}'.format(table, to_insert)
+    sql = 'INSERT OR REPLACE INTO {} VALUES {}'.format(table, to_insert) if not sql else sql
     _db_recur(cursor, sql, 'insert')
 
     if commit_to_db:
@@ -106,16 +106,15 @@ def _get_value(cursor, sql):
         _get_value(cursor, sql)
 
 
-def get_value(db, table, option):
-
+def get_value(db, table, option, sql = None):
     connection = sqlite3.connect(db)
     cursor = connection.cursor()
-    sql = 'SELECT value FROM {} WHERE option LIKE \'%{}%\''.format(table, option)
+    sql = 'SELECT value FROM {} WHERE option LIKE \'%{}%\''.format(table, option) if not sql else sql
     rows = _get_value(cursor, sql)
+    print(rows)
     cursor.close()
     connection.close()
     return_val = rows[0][0] if rows else 0
-
     return return_val
 
 
@@ -128,16 +127,13 @@ def _table_select(cursor, sql):
         _table_select(cursor, sql)
 
 
-def select_from_table(db, table, column, option):
-
+def select_from_table(db, table, column, option, sql = None):
     connection = sqlite3.connect(db)
     cursor = connection.cursor()
-    sql = 'SELECT * FROM {} WHERE {} LIKE \'%{}%\''.format(table, column, option)
-
+    sql = 'SELECT * FROM {} WHERE {} LIKE \'%{}%\''.format(table, column, option) if not sql else sql
     rows = _table_select(cursor, sql)
     cursor.close()
     connection.close()
-
     return rows
 
 
@@ -165,7 +161,7 @@ class DealCatcherDB:
         name, url, image_url, amount, in_stock, description = deal_tuple
         remove_like_value(self._dealcatcherdb, self.active_table, vendor_acronym, url)
 
-    def get_deals(self, vendor_acronym = None):
+    def get_deals(self, vendor_acronym = None, raw = False):
         if vendor_acronym:  # This is a call to show all deals for this vendor
             _rows = select_from_table(self._dealcatcherdb, self.active_table, 'vendor', vendor_acronym)
 
@@ -178,12 +174,17 @@ class DealCatcherDB:
 
         # We have a list of tuples, we need a list of lists
         matrix = list()
-        for acronym, name, url, image_url, amount, in_stock, description in matrix:
-            row = list()
-            row.append([acronym, name, url, image_url, amount, in_stock, description])
-            matrix.append(row)
+        for acronym, name, url, image_url, amount, in_stock, description in _rows:
+            product_name = f"=HYPERLINK(\"{url}\", \"{name}\")" if not raw else name
+            picture = f"=IMAGE(\"{image_url}\", 1)" if not raw else ''
+            matrix.append([acronym, product_name, amount, picture])
 
         return matrix
+
+    def get_urls(self, deal_name):
+        sql = f'SELECT name, url, image_url FROM {self.active_table} WHERE name LIKE \'%{deal_name}%\''
+        rows = select_from_table(self._dealcatcherdb, self.active_table, '', '', sql=sql)
+        return rows[0]
 
 
 dealcatcher_db = DealCatcherDB()
