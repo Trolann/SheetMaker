@@ -168,6 +168,12 @@ class ConfigDB:
         self.timer_expire = 0
         self.api_calls = 0
         self.rate_limiter = RateLimiter(max_calls=30, period=60, callback=self.limited)
+        self.deal_sheet = None
+        self.overview_sheet = None
+        self.overview_formulas = [
+            ''
+        ]
+
 
     def limited(self, until):
         duration = int(round(until - time()))
@@ -187,15 +193,23 @@ class ConfigDB:
     def new_deal(self, sheet, current_deal):
         with self.rate_limiter:
             sheet.append_row(current_deal, values_input_option='USER_ENTERED')
+            self.overview_sheet.append_row(current_deal, values_input_option='USER_ENTERED')
+
 
     def get_worksheet(self, deal_sheet, vendor_name):
+        if not self.deal_sheet:
+            self.deal_sheet = deal_sheet
         with self.rate_limiter:
-            return deal_sheet.worksheet(vendor_name)
+            if not self.overview_sheet:
+                self.overview_sheet = self.deal_sheet.worksheet('Overview')
+            return self.deal_sheet.worksheet(vendor_name)
 
     def remove_deal(self, sheet, deal_name):
-        row = sheet.find(deal_name).row
         with self.rate_limiter:
+            row = sheet.find(deal_name).row
+            overview_row = self.overview_sheet.find(deal_name).row
             sheet.delete_rows(row)
+            self.overview_sheet.delete_rows(overview_row)
 
 
 config_db = ConfigDB()
